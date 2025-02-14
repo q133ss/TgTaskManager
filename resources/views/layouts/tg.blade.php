@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Task Manager</title>
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <!-- Bootstrap CSS -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/css/bootstrap.min.css" rel="stylesheet">
     @yield('meta')
@@ -16,6 +17,10 @@
         }
         .navbar {
             background-color: #1e1e1e;
+        }
+        .navbar-nav {
+            flex-direction: row;
+            gap: 10px;
         }
         .sidebar {
             background-color: #181818;
@@ -76,12 +81,13 @@
 <body>
 
 <!-- Top Navbar -->
-<nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+<nav class="navbar navbar-dark bg-dark">
     <div class="container-fluid">
-        <ul class="navbar-nav me-auto mb-2 mb-lg-0">
-            <li class="nav-item"><a class="nav-link active" href="#">Задачи</a></li>
+        <ul class="navbar-nav">
+            @php $currentChatId = \Request()->chat_id; @endphp
+            <li class="nav-item"><a class="nav-link" href="{{route('telegram.tasks', ['chat_id' => $currentChatId, 'type' => 'tasks'])}}">Задачи</a></li>
             <li class="nav-item"><a class="nav-link" href="#">График</a></li>
-            <li class="nav-item"><a class="nav-link" href="#">Инбокс</a></li>
+            <li class="nav-item"><a class="nav-link" href="{{route('telegram.inbox', ['chat_id' => $currentChatId])}}">Инбокс</a></li>
             <li class="nav-item"><a class="nav-link" href="#">Все</a></li>
             <li class="nav-item"><a class="nav-link" href="#">Чаты</a></li>
         </ul>

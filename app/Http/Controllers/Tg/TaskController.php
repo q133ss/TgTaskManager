@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Tg\TaskController\TaskRequest;
 use App\Models\Task;
 use App\Models\User;
+use Carbon\Carbon;
 use Illuminate\Http\Request;
 
 class TaskController extends Controller
@@ -19,17 +20,38 @@ class TaskController extends Controller
         if($request->has('chat_id') && $request->has('type')){
             switch ($request->type) {
                 case 'tasks':
-                    $tasks = Task::where('chat_id', $request->chat_id)->where('date', '!=', null)->get();
-                    break;
+                    // Страница "Задачи"
+                    $user = User::where('telegram_id', $request->chat_id)->firstOrFail();
+                    $tasks = $user
+                        ->tasks()
+                        ->where('tasks.date', '!=', null)
+                        ->orderBy('tasks.date')
+                        ->get();
+
+                    // Группируем задачи по датам
+                    $groupedTasks = $tasks->groupBy(function ($task) {
+                        return Carbon::parse($task->date)->format('Y-m-d');
+                    });
+
+                    // Устанавливаем текущую дату (или переданную через параметр)
+                    $currentDate = $request->input('date') ? Carbon::parse($request->input('date')) : Carbon::today();
+
+                    Carbon::setLocale('ru');
+
+                    // Передаем данные в представление
+                    return view('telegram.tasks', [
+                        'groupedTasks' => $groupedTasks,
+                        'currentDate' => $currentDate
+                    ]);
                 case 'graphic':
-                    // Тут будут задачи разделеные по датам и часам
+                    // Тут будут задачи разделенные по датам и часам
                     return 'graphic';
                     break;
                 default:
                     $tasks = Task::where('chat_id', $request->chat_id)->get();
                     break;
             }
-            return $tasks;
+            abort(403);
         }
         abort(403);
     }
@@ -48,7 +70,12 @@ class TaskController extends Controller
      */
     public function store(TaskRequest $request)
     {
-        $task = Task::create($request->validated());
+        $data = $request->validated();
+        unset($data['chat_id']);
+
+        $data['creator_id'] = User::where('telegram_id', $request->chat_id)->pluck('id')->first();
+
+        $task = Task::create($data);
         return $task;
     }
 

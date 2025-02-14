@@ -23,7 +23,12 @@ class TelegramBotController extends Controller
         return [
             'inline_keyboard' => [
                 [
-                    ['text' => 'Inbox', 'url' => route('telegram.inbox', ['chat_id' => $chatId])]
+                    [
+                        'text' => "inbox",
+                        'web_app' => [
+                            'url' => route('telegram.inbox', ['chat_id' => $chatId])
+                        ]
+                    ]
                 ]
             ]
         ];
