@@ -5,8 +5,8 @@ use Illuminate\Support\Facades\Route;
 
 Route::post('/webhook', [TelegramBotController::class, 'handle']);
 
-Route::group(['prefix' => 'telegram'],function (){
-    Route::view('/inbox', 'telegram.inbox')->name('telegram.inbox');
+Route::group(['prefix' => 'telegram', 'name' => 'telegram.'],function (){
+    Route::get('/inbox', [\App\Http\Controllers\Tg\InboxController::class, 'index']);
 });
 
 /*
