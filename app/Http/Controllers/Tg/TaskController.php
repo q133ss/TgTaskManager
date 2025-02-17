@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Tg\TaskController\TaskRequest;
 use App\Models\Task;
 use App\Models\User;
+use App\Services\TaskService;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 
@@ -44,9 +45,37 @@ class TaskController extends Controller
                         'currentDate' => $currentDate
                     ]);
                 case 'graphic':
-                    // Тут будут задачи разделенные по датам и часам
-                    return 'graphic';
-                    break;
+                    // Устанавливаем текущую дату (или переданную через параметр)
+                    $currentDate = $request->input('date') ? Carbon::parse($request->input('date')) : Carbon::today();
+
+                    // Получаем все задачи для данного чата и текущей даты
+                    $tasks = $user
+                        ->tasks()
+                        ->whereDate('date', $currentDate->format('Y-m-d'))
+                        ->get();
+
+                    // Группируем задачи по времени
+                    $groupedTasks = [];
+                    foreach ($tasks as $task) {
+                        $time = $task->time ?? '00:00'; // Если время не указано, используем 00:00
+                        $formattedTime = \Carbon\Carbon::parse($time)->minute(0)->second(0);
+                        $groupedTasks[$formattedTime->format('H:i')][] = $task;
+                    }
+
+                    // Создаем массив для всех часов (00:00 - 23:00)
+                    $allHours = [];
+                    for ($hour = 0; $hour < 24; $hour++) {
+                        for ($minute = 0; $minute < 60; $minute += 60) {
+                            $time = str_pad($hour, 2, '0', STR_PAD_LEFT) . ':' . str_pad($minute, 2, '0', STR_PAD_LEFT);
+                            $allHours[$time] = $groupedTasks[$time] ?? []; // Добавляем пустой массив, если задач нет
+                        }
+                    }
+
+                    // Передаем данные в представление
+                    return view('telegram.graphic', [
+                        'allHours' => $allHours,
+                        'currentDate' => $currentDate,
+                    ]);
                 default:
                     // Получаем все задачи для данного chat_id
                     $tasks = $user
@@ -88,9 +117,27 @@ class TaskController extends Controller
         $data = $request->validated();
         unset($data['chat_id']);
 
-        $data['creator_id'] = User::where('telegram_id', $request->chat_id)->pluck('id')->first();
+        // Извлекаем текст задачи
+        $taskText = $data['text'];
 
+        // Регулярное выражение для поиска времени в формате HH:MM или HH-MM
+        $pattern = '/\b(\d{1,2}[:\-]\d{2})\b/';
+
+        // Ищем время в тексте
+        preg_match($pattern, $taskText, $matches);
+
+        // Если время найдено, извлекаем его и удаляем из текста
+        if (!empty($matches)) {
+            $time = $matches[0];
+            $data['time'] = $time; // Сохраняем время в отдельное поле, если нужно
+            $data['text'] = preg_replace($pattern, '', $taskText); // Удаляем время из текста
+        }
+
+        $data['creator_id'] = User::where('telegram_id', $request->chat_id)->pluck('id')->first();
         $task = Task::create($data);
+
+        (new TaskService())->createReminder($request->chat_id, $task); // Создаем напоминание
+
         return $task;
     }
 

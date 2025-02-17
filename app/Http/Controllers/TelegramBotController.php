@@ -107,9 +107,9 @@ class TelegramBotController extends Controller
                     break;
                 default:
                     // Создаем задачу
-                    $this->taskService?->create($chatId, $text, null);
+                    $create = $this->taskService?->create($chatId, $text, null);
                     $keyboard = $this->getTaskKeyboard($chatId);
-                    $this->telegramService?->sendMessage($chatId, '☑️'.$text, json_encode($keyboard));
+                    $this->telegramService?->sendMessage($chatId, '☑️'.$create->text, json_encode($keyboard));
                     break;
             }
         } elseif (isset($update['callback_query'])) {

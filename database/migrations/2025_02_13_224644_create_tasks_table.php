@@ -16,7 +16,8 @@ return new class extends Migration
             $table->foreignId('creator_id')->constrained('users')->cascadeOnDelete();
             $table->foreignId('assignee_id')->nullable()->comment('Кому задача назначена')->constrained('users')->onDelete('set null');
             $table->text('text');
-            $table->dateTime('date')->nullable();
+            $table->date('date')->nullable();
+            $table->time('time')->nullable();
             $table->boolean('is_done')->default(false);
             $table->timestamps();
         });

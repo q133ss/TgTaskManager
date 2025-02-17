@@ -25,7 +25,7 @@
     }
 </style>
 @section('content')
-    <h3>Задачи</h3>
+    <h3>График</h3>
     <div class="date-header">
         <!-- Текущая дата -->
         <span id="current-date" class="fs-7">{{ $currentDate->isoFormat('dddd, D MMMM Y г.') }}</span>
@@ -45,25 +45,26 @@
 
     <!-- Список задач -->
     <div id="task-list">
-        <ul class="task-list" id="taskList">
-        @if ($groupedTasks->has($currentDate->format('Y-m-d')))
-            @foreach ($groupedTasks[$currentDate->format('Y-m-d')] as $task)
-                <li class="task-item" id="item_{{$task->id}}">
-                    <div class="form-check">
-                        <input class="form-check-input" type="checkbox" {{$task->is_done == 1 ? 'checked' : ''}} id="task_check_{{$task->id}}" onclick="taskIsDone('{{$task->id}}', '{{$task->text}}', '{{$task->date}}')">
-                        <label class="form-check-label">{{$task->text}}</label>
-                    </div>
-                    <button type="button" class="btn btn-sm btn-outline-secondary" data-bs-toggle="modal" onclick="setTask('{{$task->id}}', '{{$task->text}}', '{{$task->date}}')" data-bs-target="#taskModal">☰</button>
-                </li>
-            @endforeach
-        @else
-            <li class="task-item" id="no-items-text">На эту дату задач нет.</li>
-        @endif
-        </ul>
+        @foreach ($allHours as $time => $tasks)
+            <strong>{{ $time  }}</strong>
+            @php $formattedTime = \Carbon\Carbon::parse($time)->format('H_i'); @endphp
+            <ul class="task-list time_{{$formattedTime}}" id="taskList">
+                @if (count($tasks) > 0)
+                    @foreach ($tasks as $task)
+                        <li class="task-item" id="item_{{$task->id}}">
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" {{$task->is_done == 1 ? 'checked' : ''}} id="task_check_{{$task->id}}" onclick="taskIsDone('{{$task->id}}', '{{$task->text}}', '{{$task->date}}')">
+                                <label class="form-check-label">{{$task->text}}</label>
+                            </div>
+                            <button type="button" class="btn btn-sm btn-outline-secondary" data-bs-toggle="modal" onclick="setTask('{{$task->id}}', '{{$task->text}}', '{{$task->date}}', '{{$formattedTime}}')" data-bs-target="#taskModal">☰</button>
+                        </li>
+                    @endforeach
+                @else
+                    <li class="task-item" id="no-items-text">На это время задач нет.</li>
+                @endif
+            </ul>
+        @endforeach
     </div>
-
-    <!-- Кнопка "Добавить задачу" -->
-    <button class="btn btn-primary mt-3" data-bs-toggle="modal" data-bs-target="#createModal">Добавить задачу</button>
 @endsection
 
 @section('footer')
@@ -94,38 +95,19 @@
         </div>
     </div>
 
-{{--    Create Modal --}}
-
-    <div class="modal fade" id="createModal" tabindex="-1" aria-labelledby="createModalLabel" aria-hidden="true">
-        <div class="modal-dialog">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title" id="createModalLabel">Добавить задачу</h5>
-                    <button type="button" class="btn-close" id="createModalClose" data-bs-dismiss="modal" aria-label="Close"></button>
-                </div>
-                <div class="modal-body">
-                    <label for="task-date" class="form-label">Задача:</label>
-                    <input type="text" class="form-control" id="task-input" placeholder="Купить хлеб">
-                </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-success" onclick="createTask()">Добавить</button>
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Закрыть</button>
-                </div>
-            </div>
-        </div>
-    </div>
-
     @php $chat_id = \Request()->chat_id; @endphp
     <script>
         let task_id = '';
         let task_text = '';
         let chat_id = '{{$chat_id}}';
         let task_date = '';
+        let formatted_time = '';
 
-        function setTask(id, text, date) {
+        function setTask(id, text, date, time_) {
             task_id = id;
             task_text = text;
             task_date = date;
+            formatted_time = time_;
         }
 
         async function duplicateTask() {
@@ -147,7 +129,7 @@
                 let new_id = data.id;
                 let new_text = data.text;
                 let new_date = data.date;
-                document.querySelector('#taskList').insertAdjacentHTML('beforeend','<li class="task-item" id="item_'+new_id+'">'+
+                document.querySelector('.time_'+formatted_time).insertAdjacentHTML('beforeend','<li class="task-item" id="item_'+new_id+'">'+
                     '<div class="form-check">'+
                     '<input class="form-check-input" type="checkbox" id="task_check_'+new_id+'" onclick="taskIsDone('+new_id+', '+new_text+', '+new_date+')">'+
                     '<label class="form-check-label">'+new_text+'</label>'+
@@ -236,49 +218,6 @@
                     });
             }
         }
-
-        async function createTask(){
-
-            const data = {
-                chat_id: '{{$chat_id}}', // ID чата
-                text: document.querySelector('#task-input').value,
-                date: '{{ $currentDate }}'
-            };
-
-            const url = `/api/task`;
-            fetch(url, {
-                    method: 'POST', // Метод запроса
-                    body: JSON.stringify(data),
-                    headers: {
-                        'Accept': 'application/json',         // Заголовок Accept
-                        'Content-Type': 'application/json'    // Заголовок Content-Type
-                    }
-                })
-                .then(response => {
-                    if (!response.ok) {
-                        throw new Error(`Ошибка HTTP! Статус: ${response.status}`);
-                    }
-                    let data = response.json();
-                    return data;
-                }).then(data => {
-                    let new_id = data.id;
-                    let new_text = data.text;
-                    let new_date = data.date;
-                    document.querySelector('#taskList').insertAdjacentHTML('beforeend','<li class="task-item" id="item_'+new_id+'">'+
-                        '<div class="form-check">'+
-                        '<input class="form-check-input" type="checkbox" id="task_check_'+new_id+'" onclick="taskIsDone('+new_id+', '+new_text+', '+new_date+')">'+
-                        '<label class="form-check-label">'+new_text+'</label>'+
-                        '</div>'+
-                        '<button type="button" class="btn btn-sm btn-outline-secondary" data-bs-toggle="modal" onclick="setTask('+new_id+', '+new_text+', '+new_date+')" data-bs-target="#taskModal">☰</button>'+
-                        '</li>');
-                    document.querySelector('#task-input').value = '';
-                    document.querySelector('#createModalClose').click();
-                    document.querySelector('#no-items-text').remove();
-                })
-                .catch(error => {
-                    console.error('Произошла ошибка:', error);
-                });
-        }
     </script>
 
     <script>
@@ -348,7 +287,7 @@
 
                 // Обновляем URL страницы с новой датой (в формате ISO для параметров)
                 const isoDate = newDate; // Дата остается в ISO-формате для передачи в URL
-                window.location.href = '?chat_id={{$chat_id}}&type=tasks&date=' + isoDate;
+                window.location.href = '?chat_id={{$chat_id}}&type=graphic&date=' + isoDate;
             }
 
             // Форматирование даты
