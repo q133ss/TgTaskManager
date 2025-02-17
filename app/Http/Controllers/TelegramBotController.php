@@ -6,6 +6,7 @@ use App\Models\User;
 use App\Services\TaskService;
 use App\Services\TelegramService;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
 
 class TelegramBotController extends Controller
 {
@@ -51,12 +52,17 @@ class TelegramBotController extends Controller
     public function handleUpdate($update): void
     {
         if (isset($update['message'])) {
-            $message = $update['message'];
-            $chatId = $message['chat']['id']; // Получаем chat_id
-            $text = $message['text'];
+            $message = $update['message'] ?? '';
+            $chatId = $message['chat']['id'] ?? ''; // Получаем chat_id
+            $text = $message['text'] ?? '';
 
             // Проверяем и создаем пользователя
             $user = $this->findOrCreateUser($chatId, $message);
+
+            if (isset($message['voice'])) {
+                // Обработка голосовых сообщений
+                $this->handleVoiceMessage($message, $chatId, $user);
+            }
 
             switch ($text) {
                 case '/start':
@@ -106,10 +112,12 @@ class TelegramBotController extends Controller
 👥 Присоединяйтесь к нашему сообществу в чате @okbob_chat – там вы всегда сможете получить ответ на свой вопрос.');
                     break;
                 default:
-                    // Создаем задачу
-                    $create = $this->taskService?->create($chatId, $text, null);
-                    $keyboard = $this->getTaskKeyboard($chatId);
-                    $this->telegramService?->sendMessage($chatId, '☑️'.$create->text, json_encode($keyboard));
+                    // Создаем задачу, если это не голосовое
+                    if(!isset($message['voice'])) {
+                        $create = $this->taskService?->create($chatId, $text, null);
+                        $keyboard = $this->getTaskKeyboard($chatId);
+                        $this->telegramService?->sendMessage($chatId, '☑️' . $create->text, json_encode($keyboard));
+                    }
                     break;
             }
         } elseif (isset($update['callback_query'])) {
@@ -123,6 +131,102 @@ class TelegramBotController extends Controller
 
             $this->handleCallbackQuery($chatId, $messageId, $data);
         }
+    }
+
+    /**
+     * Обработка голосового сообщения.
+     */
+    private function handleVoiceMessage($message, $chatId, $user)
+    {
+        $voiceFileId = $message['voice']['file_id'];
+        $token = env('BOT_TOKEN');
+
+        try {
+            // Получаем информацию о файле голосового сообщения
+            $fileResponse = Http::get("https://api.telegram.org/bot{$token}/getFile", [
+                'file_id' => $voiceFileId,
+            ]);
+            $fileInfo = json_decode($fileResponse->body(), true);
+            $filePath = $fileInfo['result']['file_path'];
+
+            // Скачиваем файл голосового сообщения
+            $fileUrl = "https://api.telegram.org/file/bot{$token}/{$filePath}";
+            $voiceFile = Http::get($fileUrl);
+
+            // Сохраняем файл локально
+            $tempFilePath = storage_path('app/temp/' . uniqid() . '.ogg');
+            file_put_contents($tempFilePath, $voiceFile->body());
+
+            // Отправляем файл в Yandex SpeechKit для распознавания
+            $recognizedText = $this->recognizeSpeechWithYandex($tempFilePath);
+
+            // Удаляем временный файл
+            unlink($tempFilePath);
+
+            // Если текст успешно распознан, создаем задачу
+            if (!empty($recognizedText)) {
+                $create = $this->taskService?->create($chatId, $recognizedText, null);
+                $keyboard = $this->getTaskKeyboard($chatId);
+                $this->telegramService?->sendMessage($chatId, '☑️' . $create->text, json_encode($keyboard));
+            } else {
+                $this->telegramService->sendMessage($chatId, "Не удалось распознать голосовое сообщение.");
+            }
+        } catch (\Exception $e) {
+            Log::error('Ошибка при обработке голосового сообщения: ' . $e->getMessage());
+            $this->telegramService->sendMessage($chatId, "Произошла ошибка при обработке голосового сообщения.");
+        }
+    }
+
+    /**
+     * Конвертирует OGG в WAV.
+     */
+    private function convertOggToWav($oggFilePath): string
+    {
+        $wavFilePath = str_replace('.ogg', '.wav', $oggFilePath);
+        exec("ffmpeg -i {$oggFilePath} -ar 16000 -ac 1 {$wavFilePath}");
+        return $wavFilePath;
+    }
+
+    /**
+     * Распознает речь с помощью Yandex SpeechKit.
+     */
+    private function recognizeSpeechWithYandex($oggFilePath): string
+    {
+        $folderId = env('YANDEX_FOLDER_ID');
+        $iamToken = env('YANDEX_IAM_TOKEN');
+
+        if (!$folderId || !$iamToken) {
+            Log::error('Не указаны folderId или iamToken для Yandex SpeechKit.');
+            return '';
+        }
+
+        // URL для распознавания речи
+        $url = "https://stt.api.cloud.yandex.net/speech/v1/stt:recognize?folderId={$folderId}&lang=ru-RU";
+
+        // Отправляем файл через cURL
+        $ch = curl_init();
+        curl_setopt($ch, CURLOPT_URL, $url);
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+        curl_setopt($ch, CURLOPT_POST, true);
+        curl_setopt($ch, CURLOPT_POSTFIELDS, file_get_contents($oggFilePath)); // Отправляем содержимое файла
+        curl_setopt($ch, CURLOPT_HTTPHEADER, [
+            'Authorization: Bearer ' . $iamToken,
+            'Content-Type: audio/ogg', // Указываем тип контента
+        ]);
+
+        // Выполняем запрос
+        $response = curl_exec($ch);
+        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        curl_close($ch);
+
+        if ($httpCode !== 200) {
+            Log::error("Ошибка при распознавании речи (HTTP {$httpCode}): " . $response);
+            return '';
+        }
+
+        // Парсим ответ
+        $result = json_decode($response, true);
+        return $result['result'] ?? ''; // Возвращаем распознанный текст
     }
 
     /**

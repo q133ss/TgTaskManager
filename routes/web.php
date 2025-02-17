@@ -3,7 +3,7 @@
 use App\Http\Controllers\TelegramBotController;
 use Illuminate\Support\Facades\Route;
 
-Route::post('/webhook', [TelegramBotController::class, 'handle']);
+//Route::post('/webhook', [TelegramBotController::class, 'handle']);
 
 Route::group(['prefix' => 'telegram', 'name' => 'telegram.'],function (){
     Route::get('/inbox', [\App\Http\Controllers\Tg\InboxController::class, 'index'])->name('telegram.inbox');
@@ -12,12 +12,8 @@ Route::group(['prefix' => 'telegram', 'name' => 'telegram.'],function (){
 
 /*
 
-1) Выводим список всех+
-2) Вывоидм график
-3) Делаем меню навигации в ТГ++
-4) Мобильная версия++
-5) Распознование речи
-
+1) Груповые чаты
+3) Теги!
 
 
 Фильтрация по тегам:
