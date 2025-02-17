@@ -17,11 +17,13 @@ class TaskController extends Controller
     public function index(Request $request)
     {
         $tasks = [];
+        $user = User::where('telegram_id', $request->chat_id)->firstOrFail();
+        Carbon::setLocale('ru');
+
         if($request->has('chat_id') && $request->has('type')){
             switch ($request->type) {
                 case 'tasks':
                     // Страница "Задачи"
-                    $user = User::where('telegram_id', $request->chat_id)->firstOrFail();
                     $tasks = $user
                         ->tasks()
                         ->where('tasks.date', '!=', null)
@@ -36,8 +38,6 @@ class TaskController extends Controller
                     // Устанавливаем текущую дату (или переданную через параметр)
                     $currentDate = $request->input('date') ? Carbon::parse($request->input('date')) : Carbon::today();
 
-                    Carbon::setLocale('ru');
-
                     // Передаем данные в представление
                     return view('telegram.tasks', [
                         'groupedTasks' => $groupedTasks,
@@ -48,8 +48,23 @@ class TaskController extends Controller
                     return 'graphic';
                     break;
                 default:
-                    $tasks = Task::where('chat_id', $request->chat_id)->get();
-                    break;
+                    // Получаем все задачи для данного chat_id
+                    $tasks = $user
+                        ->tasks()
+                        ->where('is_done', false)
+                        ->whereNotNull('date') // Убедимся, что дата не null
+                        ->orderBy('date') // Отсортируем задачи по дате
+                        ->get();
+
+                    // Группируем задачи по дате
+                    $groupedTasks = $tasks->groupBy(function ($task) {
+                        return \Carbon\Carbon::parse($task->date)->format('Y-m-d');
+                    });
+
+                    // Передаем данные в представление
+                    return view('telegram.all', [
+                        'groupedTasks' => $groupedTasks,
+                    ]);
             }
             abort(403);
         }

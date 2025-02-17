@@ -86,9 +86,9 @@
         <ul class="navbar-nav">
             @php $currentChatId = \Request()->chat_id; @endphp
             <li class="nav-item"><a class="nav-link" href="{{route('telegram.tasks', ['chat_id' => $currentChatId, 'type' => 'tasks'])}}">Задачи</a></li>
-            <li class="nav-item"><a class="nav-link" href="#">График</a></li>
+            <li class="nav-item"><a class="nav-link" href="{{route('telegram.tasks', ['chat_id' => $currentChatId, 'type' => 'graphic'])}}">График</a></li>
             <li class="nav-item"><a class="nav-link" href="{{route('telegram.inbox', ['chat_id' => $currentChatId])}}">Инбокс</a></li>
-            <li class="nav-item"><a class="nav-link" href="#">Все</a></li>
+            <li class="nav-item"><a class="nav-link" href="{{route('telegram.tasks', ['chat_id' => $currentChatId, 'type' => 'all'])}}">Все</a></li>
             <li class="nav-item"><a class="nav-link" href="#">Чаты</a></li>
         </ul>
         <button class="btn btn-outline-secondary" type="button" data-bs-toggle="offcanvas" data-bs-target="#sidebarMenu" aria-controls="sidebarMenu">
@@ -105,9 +105,9 @@
     </div>
     <div class="offcanvas-body">
         <ul class="sidebar-menu">
-            <li><a href="#">Задачи</a></li>
+            <li><a href="{{route('telegram.tasks', ['chat_id' => $currentChatId, 'type' => 'tasks'])}}">Задачи</a></li>
             <li><a href="#">График</a></li>
-            <li><a href="#">Инбокс</a></li>
+            <li><a href="{{route('telegram.inbox', ['chat_id' => $currentChatId])}}">Инбокс</a></li>
             <li><a href="#">Все</a></li>
             <li><a href="#">Чаты</a></li>
         </ul>
