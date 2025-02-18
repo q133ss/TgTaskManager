@@ -89,7 +89,7 @@
             <li class="nav-item"><a class="nav-link" href="{{route('telegram.tasks', ['chat_id' => $currentChatId, 'type' => 'graphic'])}}">График</a></li>
             <li class="nav-item"><a class="nav-link" href="{{route('telegram.inbox', ['chat_id' => $currentChatId])}}">Инбокс</a></li>
             <li class="nav-item"><a class="nav-link" href="{{route('telegram.tasks', ['chat_id' => $currentChatId, 'type' => 'all'])}}">Все</a></li>
-            <li class="nav-item"><a class="nav-link" href="#">Чаты</a></li>
+            <li class="nav-item"><a class="nav-link" href="#" data-bs-toggle="modal" data-bs-target="#chatModal">Чаты</a></li>
         </ul>
         <button class="btn btn-outline-secondary" type="button" data-bs-toggle="offcanvas" data-bs-target="#sidebarMenu" aria-controls="sidebarMenu">
             ☰
@@ -100,27 +100,66 @@
 <!-- Sidebar Menu (Offcanvas) -->
 <div class="offcanvas offcanvas-start sidebar" tabindex="-1" id="sidebarMenu" aria-labelledby="sidebarMenuLabel">
     <div class="offcanvas-header sidebar-header">
-        <h5>Имя Фамилия</h5>
+        <h5></h5>
         <button type="button" class="btn-close btn-close-white" data-bs-dismiss="offcanvas" aria-label="Close"></button>
     </div>
     <div class="offcanvas-body">
         <ul class="sidebar-menu">
             <li><a href="{{route('telegram.tasks', ['chat_id' => $currentChatId, 'type' => 'tasks'])}}">Задачи</a></li>
-            <li><a href="#">График</a></li>
+            <li><a href="{{route('telegram.tasks', ['chat_id' => $currentChatId, 'type' => 'graphic'])}}">График</a></li>
             <li><a href="{{route('telegram.inbox', ['chat_id' => $currentChatId])}}">Инбокс</a></li>
-            <li><a href="#">Все</a></li>
-            <li><a href="#">Чаты</a></li>
+            <li><a href="{{route('telegram.tasks', ['chat_id' => $currentChatId, 'type' => 'all'])}}">Все</a></li>
+            <li><a href="#" data-bs-toggle="modal" data-bs-target="#chatModal">Чаты</a></li>
         </ul>
-        <h6 class="mt-4">Задачи на сегодня:</h6>
-        <ul class="task-list">
-            <li class="task-item">
-                <div class="form-check">
-                    <input class="form-check-input" type="checkbox">
-                    <label class="form-check-label">Купить хлеб</label>
-                </div>
-                <button type="button" class="btn btn-sm btn-outline-secondary" data-bs-toggle="modal" data-bs-target="#taskModal">☰</button>
-            </li>
-        </ul>
+{{--        <h6 class="mt-4">Задачи на сегодня:</h6>--}}
+{{--        <ul class="task-list">--}}
+{{--            <li class="task-item">--}}
+{{--                <div class="form-check">--}}
+{{--                    <input class="form-check-input" type="checkbox">--}}
+{{--                    <label class="form-check-label">Купить хлеб</label>--}}
+{{--                </div>--}}
+{{--                <button type="button" class="btn btn-sm btn-outline-secondary" data-bs-toggle="modal" data-bs-target="#taskModal">☰</button>--}}
+{{--            </li>--}}
+{{--        </ul>--}}
+    </div>
+</div>
+
+<!-- Chat Modal -->
+<div class="modal fade" id="chatModal" tabindex="-1" aria-labelledby="chatModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content" style="background: #181818">
+            <div class="modal-header">
+                <h5 class="modal-title" id="chatModalLabel">Используйте всю силу {{env('BOT_USERNAME')}} групповыми чатами
+                </h5>
+                <button type="button" class="btn-close" id="taskModalClose" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <p class="text-primary">
+                    Добавьте бота {{env('BOT_USERNAME')}} в рабочий чат с коллегами
+                </p>
+                <p>
+                    Бот отправит сообщение о том, что он подключился.
+                </p>
+                <p class="text-primary">
+                    Отметьте бота в сообщении {{env('BOT_USERNAME')}}, чтобы поставить задачу на себя
+                </p>
+                <small>
+                    {{env('BOT_USERNAME')}} моя первая задача в рабочем чате.
+                </small>
+                <p class="text-primary">
+                    Поставьте задачи на коллег
+                </p>
+                <small>
+                    {{env('BOT_USERNAME')}} сверстать страницу подписки @evgeny
+                </small>
+                <p>
+                    У каждого будет создана своя задача: её можно увидеть в общем списке задач чата и в списках личных задач.
+                </p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Закрыть</button>
+            </div>
+        </div>
     </div>
 </div>
 
