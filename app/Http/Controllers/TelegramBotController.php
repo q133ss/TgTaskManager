@@ -196,7 +196,7 @@ class TelegramBotController extends Controller
             }
 
             // Создаем задачу для другого пользователя
-            $this->taskService?->create($chatId, $taskText, null, $assignee->id);
+            $this->taskService?->create($assignee->telegram_id, $taskText, null, $assignee->id);
             $this->telegramService?->sendMessage($chatId, "Задача \"$taskText\" назначена пользователю @$assigneeUsername.");
         } else {
             $user = User::where('username', $username)->first();
@@ -205,9 +205,9 @@ class TelegramBotController extends Controller
                 return;
             }
             $formattedText = str_replace(env('BOT_USERNAME'), '', $text);
-            $command = $this->proccesedCommand($chatId, trim($formattedText), $user, true);
+            $command = $this->proccesedCommand($user->telegram_id, trim($formattedText), $user, true);
             if(!$command){
-                $this->taskService?->create($chatId, $taskText, null, null, $username);
+                $this->taskService?->create($user->telegram_id, $taskText, null, null, $username);
                 $this->telegramService?->sendMessage($chatId, "Задача \"$taskText\" создана для вас, @$username.");
             }
         }
