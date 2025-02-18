@@ -1,9 +1,6 @@
 <?php
 
-use App\Http\Controllers\TelegramBotController;
 use Illuminate\Support\Facades\Route;
-
-//Route::post('/webhook', [TelegramBotController::class, 'handle']);
 
 Route::group(['prefix' => 'telegram', 'name' => 'telegram.'],function (){
     Route::get('/inbox', [\App\Http\Controllers\Tg\InboxController::class, 'index'])->name('telegram.inbox');
@@ -11,8 +8,6 @@ Route::group(['prefix' => 'telegram', 'name' => 'telegram.'],function (){
 });
 
 /*
-
-1) Груповые чаты
 3) Теги!
 
 

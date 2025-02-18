@@ -8,7 +8,7 @@ use App\Models\User;
 
 class TaskService
 {
-    public function create(string $chat_id, string $text, string $date = null)
+    public function create(string $chat_id, string $text, string $date = null, $assignee_id = null, $username = null)
     {
         // Регулярное выражение для поиска времени в формате HH:MM или HH-MM
         $pattern = '/\b(\d{1,2}[:\-]\d{2})\b/';
@@ -26,8 +26,8 @@ class TaskService
 
         // Создаем задачу
         $task = Task::create([
-            'creator_id' => User::where('telegram_id', $chat_id)->pluck('id')->first(),
-            'assignee_id' => null,
+            'creator_id' => User::where('telegram_id', $chat_id)->orWhere('username', $username)->pluck('id')->first(),
+            'assignee_id' => $assignee_id,
             'text' => $text, // Текст без времени
             'date' => $date,
             'time' => $time, // Сохраняем время, если оно было найдено

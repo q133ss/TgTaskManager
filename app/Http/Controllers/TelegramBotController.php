@@ -35,7 +35,7 @@ class TelegramBotController extends Controller
         ];
     }
 
-    private function sendTasksMessage($taks, $chatId){
+    private function sendTasksMessage($taks, $chatId, $isGroup = false){
         if($taks->isEmpty()){
             $this->telegramService->sendMessage($chatId, 'Задачи отсутствуют');
             return;
@@ -45,43 +45,43 @@ class TelegramBotController extends Controller
             $taskText .= '• '.$task->text . PHP_EOL;
         }
 
-        $keyboard = $this->getTaskKeyboard($chatId);
-        $this->telegramService->sendMessage($chatId, $taskText, json_encode($keyboard));
+        if(!$isGroup){
+            $keyboard = $this->getTaskKeyboard($chatId);
+            $this->telegramService->sendMessage($chatId, $taskText, json_encode($keyboard));
+        }else{
+            $this->telegramService->sendMessage($chatId, $taskText);
+        }
     }
 
-    public function handleUpdate($update): void
+    /**
+     * @param $chatId
+     * @param $text
+     * @param $user
+     * @param $isGroup
+     * @return bool
+     *
+     * Обрабатывает команды. Если команда не найдена, создает задачу и возвращает false
+     */
+    private function proccesedCommand($chatId, $text, $user, $isGroup): bool
     {
-        if (isset($update['message'])) {
-            $message = $update['message'] ?? '';
-            $chatId = $message['chat']['id'] ?? ''; // Получаем chat_id
-            $text = $message['text'] ?? '';
-
-            // Проверяем и создаем пользователя
-            $user = $this->findOrCreateUser($chatId, $message);
-
-            if (isset($message['voice'])) {
-                // Обработка голосовых сообщений
-                $this->handleVoiceMessage($message, $chatId, $user);
-            }
-
-            switch ($text) {
-                case '/start':
-                    $this->sendWelcomeMessage($chatId);
-                    break;
-                case '/all':
-                    $taks = $user->tasks;
-                    $this->sendTasksMessage($taks, $chatId);
-                    break;
-                case '/today':
-                    $taks = $user->tasks?->where('date', now()->format('Y-m-d'));
-                    $this->sendTasksMessage($taks, $chatId);
-                    break;
-                case '/tomorrow':
-                    $taks = $user->tasks?->where('date', now()->addDay()->format('Y-m-d'));
-                    $this->sendTasksMessage($taks, $chatId);
-                    break;
-                case '/help':
-                    $this->telegramService?->sendMessage($chatId, 'Инструкции по использованию «OK, Bob!» вы всегда можете найти на сайте okbob.app.
+        switch ($text) {
+            case '/start':
+                $this->sendWelcomeMessage($chatId);
+                break;
+            case '/all':
+                $taks = $user->tasks;
+                $this->sendTasksMessage($taks, $chatId, $isGroup);
+                break;
+            case '/today':
+                $taks = $user->tasks?->where('date', now()->format('Y-m-d'));
+                $this->sendTasksMessage($taks, $chatId, $isGroup);
+                break;
+            case '/tomorrow':
+                $taks = $user->tasks?->where('date', now()->addDay()->format('Y-m-d'));
+                $this->sendTasksMessage($taks, $chatId, $isGroup);
+                break;
+            case '/help':
+                $this->telegramService?->sendMessage($chatId, 'Инструкции по использованию «OK, Bob!» вы всегда можете найти на сайте okbob.app.
 
 Начало работы в OK, Bob!
 
@@ -110,16 +110,47 @@ class TelegramBotController extends Controller
 📢 Подписывайтесь на наш канал @okbob, чтобы быть в курсе обновлений.
 
 👥 Присоединяйтесь к нашему сообществу в чате @okbob_chat – там вы всегда сможете получить ответ на свой вопрос.');
-                    break;
-                default:
-                    // Создаем задачу, если это не голосовое
-                    if(!isset($message['voice'])) {
-                        $create = $this->taskService?->create($chatId, $text, null);
-                        $keyboard = $this->getTaskKeyboard($chatId);
-                        $this->telegramService?->sendMessage($chatId, '☑️' . $create->text, json_encode($keyboard));
-                    }
-                    break;
+                break;
+            default:
+                // Создаем задачу, если это не голосовое и если это не группа
+                if(!isset($message['voice']) && !$isGroup) {
+                    $create = $this->taskService?->create($chatId, $text, null);
+                    $keyboard = $this->getTaskKeyboard($chatId);
+                    $this->telegramService?->sendMessage($chatId, '☑️' . $create->text, json_encode($keyboard));
+                }
+                return false;
+        }
+
+        return true;
+    }
+
+    public function handleUpdate($update): void
+    {
+        if (isset($update['message'])) {
+            $message = $update['message'] ?? '';
+            $chatId = $message['chat']['id'] ?? ''; // Получаем chat_id
+            $text = $message['text'] ?? '';
+
+            $userId = $message['from']['id'];
+            $username = $message['from']['username'] ?? 'User';
+
+            $chatType = $message['chat']['type'] ?? '';
+            $isGroup = in_array($chatType, ['group', 'supergroup']); // Флаг. Сообщение из группы или из личной переписки
+
+            // Проверяем и создаем пользователя
+            $user = $this->findOrCreateUser($chatId, $message);
+
+            // Обработка голосовых сообщений
+            if (isset($message['voice'])) {
+                $this->handleVoiceMessage($message, $chatId, $user);
             }
+
+            // Обработка упоминаний бота
+            if (str_starts_with($text, env('BOT_USERNAME'))) {
+                $this->processTaskGroupCommand($text, $chatId, $userId, $username);
+            }
+
+            $this->proccesedCommand($chatId, $text, $user, $isGroup);
         } elseif (isset($update['callback_query'])) {
             $callbackQuery = $update['callback_query'];
             $data = $callbackQuery['data'];
@@ -130,6 +161,55 @@ class TelegramBotController extends Controller
             $user = $this->findOrCreateUser($chatId, $callbackQuery['message']['chat']);
 
             $this->handleCallbackQuery($chatId, $messageId, $data);
+        }
+
+        // Проверяем, был ли бот добавлен в чат
+        if (isset($message['new_chat_members'])) {
+            $chatId = $update['message']['chat']['id'];
+            foreach ($message['new_chat_members'] as $member) {
+                if ($member['id'] == env('BOT_ID')) {
+                    $this->telegramService?->sendMessage($chatId, "Спасибо, что добавили меня в этот чат! Я помогу вам управлять задачами.");
+                }
+            }
+        }
+    }
+
+    // Обработка сообщений из групповых чатов
+    private function processTaskGroupCommand($text, $chatId, $userId, $username)
+    {
+        // Удаляем упоминание бота из текста
+        $taskText = str_replace(env('BOT_USERNAME'), '', $text);
+
+        // Разделяем задачу и исполнителя (если есть)
+        preg_match('/@(\w+)$/', $taskText, $assigneeMatch); // Ищем последнее упоминание пользователя
+
+        if (!empty($assigneeMatch)) {
+            // Исполнитель указан
+            $assigneeUsername = $assigneeMatch[1];
+            $taskText = trim(str_replace($assigneeMatch[0], '', $taskText)); // Удаляем упоминание исполнителя
+
+            // Находим пользователя по username
+            $assignee = User::where('username', $assigneeUsername)->first();
+            if (!$assignee) {
+                $this->telegramService?->sendMessage($chatId, "Пользователь @$assigneeUsername не зарегистрирован в системе. Необходимо перейти в бота и отправить команду /start.");
+                return;
+            }
+
+            // Создаем задачу для другого пользователя
+            $this->taskService?->create($chatId, $taskText, null, $assignee->id);
+            $this->telegramService?->sendMessage($chatId, "Задача \"$taskText\" назначена пользователю @$assigneeUsername.");
+        } else {
+            $user = User::where('username', $username)->first();
+            if (!$user) {
+                $this->telegramService?->sendMessage($chatId, "Пользователь @$user не зарегистрирован в системе. Необходимо перейти в бота и отправить команду /start.");
+                return;
+            }
+            $formattedText = str_replace(env('BOT_USERNAME'), '', $text);
+            $command = $this->proccesedCommand($chatId, trim($formattedText), $user, true);
+            if(!$command){
+                $this->taskService?->create($chatId, $taskText, null, null, $username);
+                $this->telegramService?->sendMessage($chatId, "Задача \"$taskText\" создана для вас, @$username.");
+            }
         }
     }
 
@@ -239,10 +319,12 @@ class TelegramBotController extends Controller
     private function findOrCreateUser(int $chatId, array $chatData): \App\Models\User
     {
         // Проверяем, существует ли пользователь с таким telegram_id
-        $user = \App\Models\User::firstOrNew(['telegram_id' => $chatId]);
+        $user = \App\Models\User::where(['telegram_id' => $chatId])
+        ->orWhere('username', $chatData['from']['username'] ?? null)->first();
 
         // Если пользователь новый, заполняем данные
-        if (!$user->exists) {
+        if (!$user) {
+            $user = new \App\Models\User();
             $user->telegram_id = $chatId;
             $user->first_name = $chatData['from']['first_name'] ?? null;
             $user->last_name = $chatData['from']['last_name'] ?? null;
