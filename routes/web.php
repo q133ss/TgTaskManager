@@ -8,7 +8,7 @@ Route::group(['prefix' => 'telegram', 'name' => 'telegram.'],function (){
 });
 
 Route::view('/', 'front.index');
-Route::post('/auth', [\App\Http\Controllers\LoginController::class, 'auth'])->name('auth');
+Route::get('/auth', [\App\Http\Controllers\LoginController::class, 'auth'])->name('auth');
 Route::redirect('/login', '/')->name('login');
 
 Route::group(['middleware' => 'auth', 'prefix' => 'crm', 'as' => 'crm.'], function (){
@@ -17,20 +17,8 @@ Route::group(['middleware' => 'auth', 'prefix' => 'crm', 'as' => 'crm.'], functi
     Route::get('/all', [\App\Http\Controllers\Crm\AllController::class, 'index'])->name('all');
 });
 
-Route::get('/log', function (){
-    \Auth()->login(\App\Models\User::find(1));
-    return 11;
+Route::view('/admin/login', 'admin.login')->name('admin.login');
+Route::post('/admin/login', [\App\Http\Controllers\Admin\LoginController::class, 'login'])->name('admin.login');
+Route::group(['middleware' => 'auth', 'prefix' => 'admin'], function (){
+    Route::get('/', [\App\Http\Controllers\Admin\IndexController::class, 'index'])->name('admin.users');
 });
-
-/*
- * Делаем фронт!
- * Вход через ТГ
- * Модалки о чате и о помощи!
- *
-3) Теги!
-
-
-Фильтрация по тегам:
-• /all #bob — выведет все невыполненные задачи с тегом #bob,
-• /today #bob #work — покажет сегодняшние задачи, содержащие хотя бы один из этих тегов.
- */

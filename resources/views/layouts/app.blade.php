@@ -172,7 +172,7 @@
 
     <!-- Меню -->
     <ul class="sidebar-menu">
-        <li class="{{ request()->routeIs('crm.index') ? 'active' : '' }}"><a href="{{route('crm.index')}}">Инбокс</a></li>
+        <li class="{{ request()->routeIs('crm.index') ? 'active' : '' }}"><a href="{{route('crm.index')}}">Задачи</a></li>
         <li class="{{ request()->routeIs('crm.graphic') ? 'active' : '' }}"><a href="{{route('crm.graphic')}}">График</a></li>
         <li class="{{ request()->routeIs('crm.all') ? 'active' : '' }}"><a href="{{route('crm.all')}}">Все невыполненные</a></li>
         <li><a href="#" data-bs-toggle="modal" data-bs-target="#chatModal">Чаты</a></li>

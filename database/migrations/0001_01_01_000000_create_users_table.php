@@ -18,6 +18,7 @@ return new class extends Migration
             $table->string('username')->nullable(); // Username Telegram
             $table->string('telegram_id')->unique(); // Уникальный ID Telegram
             $table->string('avatar_url')->nullable();
+            $table->boolean('is_admin')->default(false);
             $table->timestamps();
         });
 

@@ -15,7 +15,6 @@ class AllController extends Controller
         $tasks = $user
             ->tasks()
             ->where('is_done', false)
-            ->whereNotNull('date') // Убедимся, что дата не null
             ->orderBy('date') // Отсортируем задачи по дате
             ->get();
 

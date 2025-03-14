@@ -14,29 +14,37 @@ class LoginController extends Controller
         // Получаем параметры из запроса
         $data = $request->all();
 
-        // Проверяем подпись Telegram
-        if (!$this->verifyTelegramData($data)) {
-            abort(403, 'Invalid Telegram signature.');
-        }
-
-        // Извлекаем данные пользователя
-        $userId = $data['id'];
-        $firstName = $data['first_name'];
-        $lastname = $data['last_name'] ?? null;
         $username = $data['username'] ?? null;
-        $photoUrl = $data['photo_url'] ?? null;
 
-        // Создаем или находим пользователя в базе данных
-        $user = \App\Models\User::firstOrCreate(
-            ['username' => $username],
-            [
-                'first_name' => $firstName,
-                'last_name' => $lastname,
-                'username' => $username,
-                'avatar_url' => $photoUrl,
-                'telegram_id' => $userId
-            ]
-        );
+        $userCheck = \App\Models\User::where(['username' => $username]);
+
+        if($userCheck->exists()){
+            $user = $userCheck->first();
+        }else{
+            // Проверяем подпись Telegram
+            if (!$this->verifyTelegramData($data)) {
+                abort(403, 'Invalid Telegram signature.');
+            }
+
+            // Извлекаем данные пользователя
+            $userId = $data['id'];
+            $firstName = $data['first_name'];
+            $lastname = $data['last_name'] ?? null;
+            $photoUrl = $data['photo_url'] ?? null;
+
+            // Создаем или находим пользователя в базе данных
+            $user = \App\Models\User::create(
+                [
+                    'username' => $username,
+                    'first_name' => $firstName,
+                    'last_name' => $lastname,
+                    'username' => $username,
+                    'avatar_url' => $photoUrl,
+                    'telegram_id' => $userId
+                ]
+            );
+
+        }
 
         // Авторизуем пользователя
         \Auth::login($user);
@@ -50,12 +58,23 @@ class LoginController extends Controller
      */
     private function verifyTelegramData(array $data): bool
     {
+        // Список допустимых параметров от Telegram
+        $allowedKeys = ['id', 'first_name', 'last_name', 'username', 'photo_url', 'auth_date', 'hash'];
+
+        // Фильтруем данные, оставляя только разрешенные ключи
+        $filteredData = array_filter($data, function ($key) use ($allowedKeys) {
+            return in_array($key, $allowedKeys);
+        }, ARRAY_FILTER_USE_KEY);
+
+        // Удаляем пробелы и символы новой строки из значений
+        $filteredData = array_map('trim', $filteredData);
+
         // Сортируем параметры по ключам
-        ksort($data);
+        ksort($filteredData);
 
         // Формируем строку для проверки подписи
         $checkString = '';
-        foreach ($data as $key => $value) {
+        foreach ($filteredData as $key => $value) {
             if ($key !== 'hash') {
                 $checkString .= "{$key}={$value}\n";
             }
@@ -69,6 +88,6 @@ class LoginController extends Controller
         $expectedHash = hash_hmac('sha256', $checkString, $secretKey);
 
         // Сравниваем хэши
-        return hash_equals($expectedHash, $data['hash']);
+        return hash_equals($expectedHash, $filteredData['hash']);
     }
 }
